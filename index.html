@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>貼文產生器</title>
+<style>
+  :root{
+    --bg:#f5f6fa; --card:#ffffff; --text:#1f2430; --muted:#6b7280;
+    --border:#e2e5ee; --accent:#6c5ce7; --accent-text:#ffffff; --soft:#efedff;
+    --shadow:0 4px 20px rgba(30,30,60,.08);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14151c; --card:#1e2029; --text:#eceef5; --muted:#9aa0b2;
+      --border:#2f3242; --accent:#8b7dff; --accent-text:#14151c; --soft:#2a2850;
+      --shadow:0 4px 20px rgba(0,0,0,.4);
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    line-height:1.6; padding:24px 16px 60px;
+  }
+  .wrap{max-width:1000px; margin:0 auto}
+  h1{font-size:26px; margin:0 0 4px}
+  .sub{color:var(--muted); margin:0 0 22px; font-size:14px}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+  @media (max-width:820px){.grid{grid-template-columns:1fr}}
+  .card{
+    background:var(--card); border:1px solid var(--border);
+    border-radius:16px; padding:20px; box-shadow:var(--shadow);
+  }
+  .card h2{font-size:16px; margin:0 0 14px}
+  label{display:block; font-size:13px; font-weight:600; margin:14px 0 6px}
+  label:first-of-type{margin-top:0}
+  input[type=text], select, textarea{
+    width:100%; padding:10px 12px; border-radius:10px;
+    border:1px solid var(--border); background:var(--bg); color:var(--text);
+    font:inherit; font-size:14px; outline:none;
+  }
+  input[type=text]:focus, select:focus, textarea:focus{border-color:var(--accent)}
+  textarea{resize:vertical; min-height:80px}
+  .chips{display:flex; flex-wrap:wrap; gap:8px}
+  .chip{
+    padding:7px 14px; border-radius:999px; border:1px solid var(--border);
+    background:var(--bg); color:var(--text); font:inherit; font-size:13px; cursor:pointer;
+  }
+  .chip.on{background:var(--accent); color:var(--accent-text); border-color:var(--accent)}
+  .row{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
+  .row > *{flex:1; min-width:120px}
+  .switch{display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; flex:0 0 auto}
+  .switch input{accent-color:var(--accent); width:16px; height:16px}
+  .btns{display:flex; gap:10px; margin-top:20px; flex-wrap:wrap}
+  button.btn{
+    padding:11px 20px; border-radius:10px; border:1px solid var(--border);
+    background:var(--card); color:var(--text); font:inherit; font-size:14px;
+    font-weight:600; cursor:pointer;
+  }
+  button.btn.primary{background:var(--accent); color:var(--accent-text); border-color:var(--accent); flex:1}
+  button.btn:hover{filter:brightness(1.06)}
+  button.btn:active{transform:scale(.98)}
+  #output{min-height:260px; font-size:15px; line-height:1.7}
+  .meta{display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:12px; color:var(--muted)}
+  .over{color:#e5484d; font-weight:700}
+  .history{margin-top:18px}
+  .history h3{font-size:13px; margin:0 0 8px; color:var(--muted)}
+  .hitem{
+    display:block; width:100%; text-align:left; padding:8px 10px; margin-bottom:6px;
+    border-radius:8px; border:1px solid var(--border); background:var(--bg);
+    color:var(--text); font:inherit; font-size:12px; cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .hitem:hover{border-color:var(--accent)}
+  #toast{
+    position:fixed; left:50%; bottom:30px; transform:translate(-50%,20px);
+    background:var(--text); color:var(--bg); padding:10px 20px; border-radius:999px;
+    font-size:14px; opacity:0; pointer-events:none; transition:.25s; z-index:99;
+  }
+  #toast.show{opacity:1; transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>✍️ 貼文產生器</h1>
+  <p class="sub">輸入主題與重點，一鍵產生適合各平台的貼文，可再手動修改後複製。</p>
+
+  <div class="grid">
+    <!-- 左：設定 -->
+    <div class="card">
+      <h2>貼文設定</h2>
+
+      <label for="topic">主題 / 產品 / 活動名稱</label>
+      <input type="text" id="topic" placeholder="例如：新開幕咖啡廳、週末市集、新品上市">
+
+      <label for="points">重點內容（每行一點，或用逗號分隔）</label>
+      <textarea id="points" placeholder="例如：&#10;手沖單品咖啡&#10;自製手工甜點&#10;開幕首週全面 85 折"></textarea>
+
+      <label>平台</label>
+      <div class="chips" id="platformChips"></div>
+
+      <label>語氣</label>
+      <div class="chips" id="toneChips"></div>
+
+      <label>長度</label>
+      <div class="chips" id="lengthChips"></div>
+
+      <label for="cta">行動呼籲（選填）</label>
+      <input type="text" id="cta" placeholder="例如：點連結預約、留言告訴我、快來店裡坐坐">
+
+      <div class="row" style="margin-top:14px">
+        <div>
+          <label for="tags" style="margin-top:0">額外 Hashtag（選填，空白或逗號分隔）</label>
+          <input type="text" id="tags" placeholder="例如：台北美食 下午茶">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <label class="switch" style="margin:0"><input type="checkbox" id="useEmoji" checked> 使用表情符號</label>
+        <label class="switch" style="margin:0"><input type="checkbox" id="useTags" checked> 加上 Hashtag</label>
+      </div>
+
+      <div class="btns">
+        <button class="btn primary" id="genBtn">✨ 產生貼文</button>
+        <button class="btn" id="clearBtn">清除</button>
+      </div>
+    </div>
+
+    <!-- 右：結果 -->
+    <div class="card">
+      <h2>產生結果（可直接編輯）</h2>
+      <textarea id="output" placeholder="按下「產生貼文」後，結果會顯示在這裡…"></textarea>
+      <div class="meta">
+        <span id="count">0 字</span>
+        <span id="limit"></span>
+      </div>
+      <div class="btns">
+        <button class="btn primary" id="copyBtn">📋 複製貼文</button>
+        <button class="btn" id="regenBtn">🔄 換一個版本</button>
+      </div>
+      <div class="history" id="historyBox" style="display:none">
+        <h3>最近產生的版本（點一下可還原）</h3>
+        <div id="historyList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  /* ---------- 設定資料 ---------- */
+  var PLATFORMS = {
+    ig:   {name:"Instagram", limit:2200, tagMax:10, tagLine:true},
+    fb:   {name:"Facebook",  limit:63206, tagMax:3, tagLine:true},
+    th:   {name:"Threads",   limit:500,  tagMax:1, tagLine:false},
+    x:    {name:"X (Twitter)", limit:280, tagMax:2, tagLine:false},
+    li:   {name:"LinkedIn",  limit:3000, tagMax:4, tagLine:true}
+  };
+  var TONES = {
+    casual:{name:"輕鬆親切", emoji:["😊","✨","🌈","☕","💛"],
+      hooks:["欸，跟你們分享一件事！{t}來了～","最近被「{t}」整個圈粉！","今天想跟大家聊聊{t}。","你有聽過{t}嗎？我真的要推爆！","日常小確幸：{t}。"],
+      lead:["說真的，用過就回不去了。","我自己是超級喜歡。","越看越有感覺，真的。"],
+      closes:["就這樣，我們下次見！","有想法的話，隨時跟我聊聊。","希望你也會喜歡。"]},
+    pro:{name:"專業正式", emoji:["📌","✅","📈","💼","🔍"],
+      hooks:["【重點分享】{t}","關於{t}，我們整理了以下重點。","{t}：你需要知道的幾件事。","正式發布：{t}","{t}，為您帶來全新選擇。"],
+      lead:["以下是我們的核心特色與價值。","我們持續優化，只為提供更好的體驗。","歡迎進一步了解細節。"],
+      closes:["期待與您交流。","如有任何疑問，歡迎與我們聯繫。","感謝您的關注與支持。"]},
+    warm:{name:"溫馨感性", emoji:["🌿","💌","🌸","🤍","🕯️"],
+      hooks:["有些美好，值得慢慢說給你聽：{t}。","因為{t}，今天多了一點溫暖。","這陣子，我一直想著{t}。","{t}，是我想與你分享的小故事。","在忙碌的日子裡，{t}讓我們停下腳步。"],
+      lead:["願這份心意，能被你感受到。","每一個細節，都是用心的證明。","生活，就是由這些小事組成。"],
+      closes:["謝謝你願意停下來看看。","願你今天也被溫柔對待。","我們都值得被好好對待。"]},
+    fun:{name:"幽默搞笑", emoji:["🤣","😎","🔥","🙈","🎉"],
+      hooks:["警告⚠️：看完{t}你的錢包可能會有感覺。","我本來只是路過，結果被{t}抓住了。","{t}？這不就是我人生缺的那一塊嗎！","朋友問我最近在忙什麼，我說：{t}。","今日新聞：{t}，全場沸騰！"],
+      lead:["不誇張，真的有點猛。","我已經先用為敬了。","不看會後悔，看了會更想要。"],
+      closes:["（別問，問就是真心推薦）","笑一笑，十年少，就這樣。","好了我不說了，去忙了。"]},
+    promo:{name:"促銷推廣", emoji:["🔥","🎁","⏰","💥","🛒"],
+      hooks:["限時登場！{t}強勢開賣！","{t}｜錯過今天再等一年！","🔥重磅來襲🔥 {t}","年度必搶：{t}，數量有限！","{t}優惠開跑，手腳要快！"],
+      lead:["現在入手最划算。","好評不斷，熱銷中。","最後機會，別再猶豫。"],
+      closes:["名額有限，額滿為止！","把握時間，晚了就沒了！","手刀搶購，立即行動！"]}
+  };
+  var BULLETS = ["✔️","⭐","📍","💡","🎯","🌟"];
+
+  var state = {platform:"ig", tone:"casual", length:"medium"};
+  var history = [];
+
+  /* ---------- 工具 ---------- */
+  function $(id){return document.getElementById(id);}
+  function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+  function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  function splitList(s){return s.split(/[\n,，、;；]+/).map(function(x){return x.trim();}).filter(Boolean);}
+  function cleanTag(s){return s.replace(/^#+/,"").replace(/[\s#,，。.!！?？「」『』（）()]+/g,"");}
+
+  var toastTimer;
+  function toast(msg){
+    var el=$("toast"); el.textContent=msg; el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){el.classList.remove("show");},1800);
+  }
+
+  /* ---------- 建立選項按鈕 ---------- */
+  function buildChips(boxId, items, key){
+    var box=$(boxId); box.innerHTML="";
+    Object.keys(items).forEach(function(k){
+      var b=document.createElement("button");
+      b.type="button"; b.className="chip"+(state[key]===k?" on":"");
+      b.textContent=items[k].name || items[k];
+      b.addEventListener("click",function(){
+        state[key]=k;
+        Array.prototype.forEach.call(box.children,function(c){c.classList.remove("on");});
+        b.classList.add("on");
+        updateLimit();
+      });
+      box.appendChild(b);
+    });
+  }
+  buildChips("platformChips", PLATFORMS, "platform");
+  buildChips("toneChips", TONES, "tone");
+  buildChips("lengthChips", {short:"精簡",medium:"標準",long:"完整"}, "length");
+
+  /* ---------- 產生貼文 ---------- */
+  function generate(){
+    var topic=$("topic").value.trim();
+    if(!topic){
+      toast("請先輸入主題");
+      $("topic").focus();
+      return;
+    }
+    var T=TONES[state.tone], P=PLATFORMS[state.platform];
+    var useEmoji=$("useEmoji").checked, useTags=$("useTags").checked;
+    var points=splitList($("points").value);
+    var cta=$("cta").value.trim();
+    var emo=function(){return useEmoji?pick(T.emoji):"";};
+
+    var parts=[];
+
+    // 開頭
+    var hook=pick(T.hooks).replace(/\{t\}/g,topic);
+    parts.push((useEmoji?emo()+" ":"")+hook);
+
+    // 引言（標準以上）
+    if(state.length!=="short"){ parts.push(pick(T.lead)); }
+
+    // 重點
+    if(points.length){
+      var max = state.length==="short" ? 2 : (state.length==="medium" ? 4 : 8);
+      var bl = shuffle(BULLETS);
+      var lines = points.slice(0,max).map(function(p,i){
+        return (useEmoji?bl[i%bl.length]:"•")+" "+p;
+      });
+      parts.push(lines.join("\n"));
+    }
+
+    // 結語（完整才加）
+    if(state.length==="long"){ parts.push(pick(T.closes)+(useEmoji?" "+emo():"")); }
+
+    // CTA
+    if(cta){ parts.push((useEmoji?"👉 ":"→ ")+cta); }
+
+    var text=parts.join("\n\n");
+
+    // Hashtag
+    if(useTags){
+      var tags=[];
+      cleanTag(topic) && tags.push(cleanTag(topic));
+      topic.split(/[\s,，、]+/).forEach(function(w){ if(w.length>=2) tags.push(cleanTag(w)); });
+      splitList($("tags").value.replace(/\s+/g,",")).forEach(function(w){ tags.push(cleanTag(w)); });
+      var extra={casual:["日常","分享"],pro:["專業","趨勢"],warm:["溫暖","生活"],fun:["哈哈","日常迷因"],promo:["限時優惠","好物推薦"]}[state.tone];
+      extra.forEach(function(w){tags.push(w);});
+      var seen={}, uniq=[];
+      tags.forEach(function(t){ if(t && !seen[t]){seen[t]=1;uniq.push(t);} });
+      uniq=uniq.slice(0,P.tagMax);
+      if(uniq.length){
+        var tagStr=uniq.map(function(t){return "#"+t;}).join(" ");
+        text += (P.tagLine ? "\n\n" : "\n") + tagStr;
+      }
+    }
+
+    $("output").value=text;
+    updateCount();
+    pushHistory(text);
+  }
+
+  /* ---------- 計數與限制 ---------- */
+  function updateCount(){
+    var len=$("output").value.length;
+    $("count").textContent=len+" 字";
+    updateLimit();
+  }
+  function updateLimit(){
+    var P=PLATFORMS[state.platform], len=$("output").value.length, el=$("limit");
+    if(len>P.limit){
+      el.className="over"; el.textContent=P.name+" 上限 "+P.limit+" 字，超出 "+(len-P.limit)+" 字";
+    }else{
+      el.className=""; el.textContent=P.name+" 上限 "+P.limit+" 字";
+    }
+  }
+
+  /* ---------- 歷史紀錄 ---------- */
+  function pushHistory(text){
+    history.unshift(text);
+    history=history.slice(0,5);
+    var box=$("historyList"); box.innerHTML="";
+    history.forEach(function(h){
+      var b=document.createElement("button");
+      b.type="button"; b.className="hitem";
+      b.textContent=h.replace(/\s+/g," ");
+      b.addEventListener("click",function(){
+        $("output").value=h; updateCount(); toast("已還原此版本");
+      });
+      box.appendChild(b);
+    });
+    $("historyBox").style.display = history.length>1 ? "block" : "none";
+  }
+
+  /* ---------- 複製 ---------- */
+  function copyText(){
+    var ta=$("output"), text=ta.value;
+    if(!text.trim()){ toast("目前沒有可複製的內容"); return; }
+    function fallback(){
+      try{
+        ta.focus(); ta.select();
+        var ok=document.execCommand("copy");
+        ta.setSelectionRange(0,0);
+        toast(ok?"已複製到剪貼簿 ✅":"複製失敗，請手動選取複製");
+      }catch(e){ toast("複製失敗，請手動選取複製"); }
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){
+        toast("已複製到剪貼簿 ✅");
+      }).catch(fallback);
+    }else{ fallback(); }
+  }
+
+  /* ---------- 事件 ---------- */
+  $("genBtn").addEventListener("click",generate);
+  $("regenBtn").addEventListener("click",generate);
+  $("copyBtn").addEventListener("click",copyText);
+  $("output").addEventListener("input",updateCount);
+  $("clearBtn").addEventListener("click",function(){
+    ["topic","points","cta","tags","output"].forEach(function(id){$(id).value="";});
+    updateCount(); toast("已清除");
+  });
+  $("topic").addEventListener("keydown",function(e){ if(e.key==="Enter"){generate();} });
+
+  updateCount();
+})();
+</script>
+</body>
+</html>
